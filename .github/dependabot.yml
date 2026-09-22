@@ -1,0 +1,10 @@
+# litellm e demais pacotes Python ficam fixados no requirements.lock de propósito:
+# atualize com `make lock` depois de revisar o changelog.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directories: [/, /clients/github-app, /tests/mock_azure]
+    schedule: { interval: weekly }

@@ -1,0 +1,114 @@
+# =============================================================================
+# Configuração do LiteLLM Proxy (gateway)
+#
+# - Nenhum segredo neste arquivo: tudo que é sensível vem de variável de ambiente
+#   via `os.environ/NOME`. No Kubernetes essas variáveis são preenchidas a partir
+#   do vault (External Secrets Operator -> Secret -> env).
+# - O entrypoint (`ai-gateway`) valida, antes de subir, que toda referência
+#   `os.environ/...` deste arquivo está definida — pod sem segredo falha no boot,
+#   não na primeira requisição.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Deployments da Azure OpenAI
+#
+#   model_name   -> nome público que os clientes (VS Code, GitHub App) usam.
+#   model        -> "azure/<nome-do-deployment-no-Azure>".
+#   api_base     -> endpoint do recurso: https://<recurso>.openai.azure.com
+#   api_version  -> versão da API data-plane (ex.: 2025-04-01-preview). Use "v1"
+#                   para a API v1 da Azure (/openai/v1/, sem api-version datada).
+#   base_model   -> modelo de referência para cálculo de CUSTO. Obrigatório na
+#                   Azure, pois o nome do deployment é livre e o LiteLLM não
+#                   consegue inferir o preço por ele.
+#   tpm/rpm      -> cota do deployment na Azure; o roteador usa para balancear.
+# -----------------------------------------------------------------------------
+model_list:
+  - model_name: gpt-5.4
+    litellm_params:
+      model: azure/gpt-5.4
+      api_base: os.environ/AZURE_API_BASE
+      api_version: os.environ/AZURE_API_VERSION
+      api_key: os.environ/AZURE_API_KEY
+      tpm: 1000000
+      rpm: 1000
+    model_info:
+      base_model: azure/gpt-5.4
+      access_groups: ["premium"]
+
+  - model_name: gpt-5.4-mini
+    litellm_params:
+      model: azure/gpt-5.4-mini
+      api_base: os.environ/AZURE_API_BASE
+      api_version: os.environ/AZURE_API_VERSION
+      api_key: os.environ/AZURE_API_KEY
+      tpm: 2000000
+      rpm: 2000
+    model_info:
+      base_model: azure/gpt-5.4-mini
+      access_groups: ["standard"]
+
+  - model_name: text-embedding-3-small
+    litellm_params:
+      model: azure/text-embedding-3-small
+      api_base: os.environ/AZURE_API_BASE
+      api_version: os.environ/AZURE_API_VERSION
+      api_key: os.environ/AZURE_API_KEY
+    model_info:
+      base_model: azure/text-embedding-3-small
+      mode: embedding
+      access_groups: ["standard"]
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  timeout: 600
+  allowed_fails: 3
+  cooldown_time: 30
+  # Se o modelo premium falhar (429/5xx/indisponível), tenta o mini.
+  fallbacks:
+    - gpt-5.4: ["gpt-5.4-mini"]
+  # Redis (para múltiplas réplicas) é injetado automaticamente pelo entrypoint
+  # quando REDIS_HOST está definido. Veja src/ai_gateway/bootstrap.py.
+
+litellm_settings:
+  drop_params: true
+  request_timeout: 600
+  json_logs: true
+  # Prompts e respostas NÃO são enviados para callbacks (OTEL etc.). Só metadados.
+  turn_off_message_logging: true
+  callbacks:
+    - prometheus                                # /metrics: gasto, tokens, latência, orçamento restante
+    - otel                                      # traces OTLP (configurado por OTEL_* env)
+    - ai_gateway.hooks.policy_hook              # políticas de requisição (teto de tokens, time obrigatório)
+    - ai_gateway.callbacks.cost_audit_logger    # log de auditoria de custo + métricas por cliente
+
+  # --- Controle de custo: padrões e tetos ---
+  # Orçamento padrão de todo usuário interno criado sem orçamento explícito.
+  max_internal_user_budget: 30        # USD
+  internal_user_budget_duration: 30d
+  # Valores aplicados em /key/generate quando o chamador não informa.
+  default_key_generate_params:
+    max_budget: 20
+    budget_duration: 30d
+    duration: 90d
+  # Tetos que NENHUMA chave pode ultrapassar (nem gerada pelo admin do time).
+  upperbound_key_generate_params:
+    max_budget: 200
+    budget_duration: 30d
+    duration: 180d
+    rpm_limit: 300
+    tpm_limit: 2000000
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  # Modelos são "config as code": só este arquivo define deployments.
+  store_model_in_db: false
+  # O orçamento pessoal do usuário vale também para as chaves de time dele
+  # (por padrão o LiteLLM só aplica às chaves pessoais).
+  apply_user_budget_to_team_keys: true
+  # Frequência (s) com que o gasto acumulado em memória é gravado no Postgres.
+  proxy_batch_write_at: 30
+  database_connection_pool_limit: 10
+  # Health checks de fundo chamam o modelo e geram custo: desligados.
+  background_health_checks: false

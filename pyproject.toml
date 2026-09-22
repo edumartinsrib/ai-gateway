@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-gateway"
+version = "0.1.0"
+description = "Gateway LLM corporativo sobre LiteLLM: Azure OpenAI, virtual keys por usuário/time com orçamento e observabilidade."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12,<3.14"
+authors = [{ name = "Eduardo Martins" }]
+dependencies = [
+    # Versão fixada de propósito: atualize conscientemente e regenere o requirements.lock.
+    "litellm[proxy,extra-proxy]==1.102.0",
+    "prometheus-client>=0.20,<1",
+    # Mesmas versões que o LiteLLM 1.102 declara no extra proxy-runtime.
+    "opentelemetry-api==1.28.0",
+    "opentelemetry-sdk==1.28.0",
+    "opentelemetry-exporter-otlp==1.28.0",
+    "opentelemetry-instrumentation-fastapi==0.49b0",
+    "httpx>=0.27,<1",
+    "pyyaml>=6,<7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6", "openai>=1.50"]
+
+[project.scripts]
+ai-gateway = "ai_gateway.server:main"
+gatewayctl = "ai_gateway.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_gateway"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+src = ["src", "tests", "clients/github-app"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM", "RUF"]
+ignore = ["S101", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S311"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+asyncio_mode = "auto"
+markers = ["integration: requer a stack do docker compose rodando (make up)"]

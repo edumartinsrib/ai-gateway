@@ -1,0 +1,47 @@
+# Ambiente local (kind/minikube): Postgres e mock da Azure dentro do cluster, segredos de
+# teste gerados aqui (sem vault). NÃO use em produção.
+#
+#   make kind-up    # cria o cluster, builda/carrega as imagens e aplica este overlay
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ai-gateway
+
+resources:
+  - ../../base
+  - postgres.yaml
+  - mock-azure.yaml
+
+configMapGenerator:
+  - name: ai-gateway-env
+    behavior: merge
+    literals:
+      - AZURE_API_BASE=http://mock-azure:8080
+      - OTEL_ENVIRONMENT_NAME=local
+
+secretGenerator:
+  - name: ai-gateway-secrets
+    literals:
+      - AZURE_API_KEY=mock-azure-key
+      - LITELLM_MASTER_KEY=sk-local-master-key
+      - LITELLM_SALT_KEY=sk-local-salt-key
+      - DATABASE_URL=postgresql://litellm:litellm@postgres:5432/litellm
+
+images:
+  - name: ai-gateway
+    newName: ai-gateway
+    newTag: dev
+
+patches:
+  - target: { kind: Deployment, name: ai-gateway }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests
+        value: { cpu: 100m, memory: 512Mi }
+  - target: { kind: HorizontalPodAutoscaler, name: ai-gateway }
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1

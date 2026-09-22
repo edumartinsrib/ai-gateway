@@ -1,0 +1,22 @@
+# Segredos lidos do Azure Key Vault pelo External Secrets Operator, autenticando com
+# Azure Workload Identity (sem credencial estática no cluster).
+#
+# Pré-requisitos (exemplo):
+#   az keyvault secret set --vault-name <kv> --name azure-openai-api-key --value <chave>
+#   az keyvault secret set --vault-name <kv> --name ai-gateway-master-key --value sk-...
+#   az keyvault secret set --vault-name <kv> --name ai-gateway-salt-key --value sk-...
+#   az keyvault secret set --vault-name <kv> --name ai-gateway-database-url --value postgresql://...
+#   Identidade gerenciada com "Key Vault Secrets User" no cofre e credencial federada
+#   para system:serviceaccount:ai-gateway:ai-gateway.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - secretstore.yaml
+  - externalsecret.yaml
+patches:
+  - target: { kind: ServiceAccount, name: ai-gateway }
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          azure.workload.identity/client-id: 00000000-0000-0000-0000-000000000000  # altere no overlay

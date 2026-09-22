@@ -1,0 +1,20 @@
+# GitHub App no mesmo cluster do gateway, falando com ele pela rede interna.
+#   kubectl apply -k clients/github-app/deploy
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: github-app
+resources:
+  - namespace.yaml
+  - externalsecret.yaml
+  - deployment.yaml
+  - httproute.yaml
+configMapGenerator:
+  - name: github-app-env
+    literals:
+      - GATEWAY_URL=http://ai-gateway.ai-gateway.svc:4000
+      - GATEWAY_MODEL=gpt-5.4-mini
+      - GITHUB_APP_ID=123456          # altere
+images:
+  - name: github-app
+    newName: ghcr.io/edumartinsrib/ai-gateway-github-app
+    newTag: 0.1.0

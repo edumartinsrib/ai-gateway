@@ -1,0 +1,61 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ai-gateway
+  labels:
+    release: kube-prometheus-stack   # ajuste ao seletor do seu Prometheus
+spec:
+  groups:
+    - name: ai-gateway.budget
+      rules:
+        - alert: AIGatewayTeamBudgetNearlyExhausted
+          expr: |
+            min by (team_alias) (litellm_remaining_team_budget_metric)
+              / max by (team_alias) (litellm_team_max_budget_metric > 0) < 0.10
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: "Time {{ $labels.team_alias }} usou mais de 90% do orçamento"
+            description: "Restam {{ $value | humanizePercentage }} do orçamento. Ao zerar, as chaves do time recebem HTTP 429."
+        - alert: AIGatewayTeamBudgetExhausted
+          expr: min by (team_alias) (litellm_remaining_team_budget_metric) <= 0
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "Orçamento do time {{ $labels.team_alias }} esgotado: requisições bloqueadas"
+        - alert: AIGatewaySpendSpike
+          # Ajuste o limiar (USD/hora) à realidade do seu consumo.
+          expr: sum(rate(litellm_spend_metric_total[30m])) * 3600 > 50
+          for: 30m
+          labels: { severity: warning }
+          annotations:
+            summary: "Gasto acima de 50 USD/h nos últimos 30 min ({{ $value | humanize }} USD/h)"
+    - name: ai-gateway.availability
+      rules:
+        - alert: AIGatewayDown
+          expr: absent(up{job="ai-gateway"} == 1)
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "Nenhuma réplica do AI Gateway sendo coletada pelo Prometheus"
+        - alert: AIGatewayHighErrorRate
+          expr: |
+            sum(rate(litellm_proxy_failed_requests_metric_total{exception_status=~"5.."}[5m]))
+              / clamp_min(sum(rate(litellm_proxy_total_requests_metric_total[5m])), 1e-9) > 0.05
+          for: 10m
+          labels: { severity: critical }
+          annotations:
+            summary: "Mais de 5% das requisições ao gateway falhando com 5xx"
+        - alert: AIGatewayAzureDeploymentOutage
+          expr: max by (litellm_model_name, api_base) (litellm_deployment_state) == 2
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "Deployment {{ $labels.litellm_model_name }} ({{ $labels.api_base }}) fora do ar"
+        - alert: AIGatewaySlowFirstToken
+          expr: |
+            histogram_quantile(0.95, sum by (le, model) (rate(litellm_llm_api_time_to_first_token_metric_bucket[10m]))) > 15
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: "p95 do tempo até o primeiro token de {{ $labels.model }} acima de 15s"

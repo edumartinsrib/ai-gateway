@@ -1,0 +1,28 @@
+[
+  {
+    "name": "AI Gateway",
+    "vendor": "customendpoint",
+    "apiKey": "${input:aiGatewayKey}",
+    "apiType": "chat-completions",
+    "models": [
+      {
+        "id": "gpt-5.4",
+        "name": "GPT-5.4 (AI Gateway)",
+        "url": "https://ai-gateway.example.com/v1/chat/completions",
+        "toolCalling": true,
+        "vision": true,
+        "maxInputTokens": 272000,
+        "maxOutputTokens": 32768
+      },
+      {
+        "id": "gpt-5.4-mini",
+        "name": "GPT-5.4 mini (AI Gateway)",
+        "url": "https://ai-gateway.example.com/v1/chat/completions",
+        "toolCalling": true,
+        "vision": true,
+        "maxInputTokens": 272000,
+        "maxOutputTokens": 32768
+      }
+    ]
+  }
+]

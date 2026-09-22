@@ -1,0 +1,42 @@
+# Produção: segredos do vault (ESO), Redis gerenciado, Prometheus/Grafana e Gateway API.
+# Troque os valores marcados com change-me antes de aplicar.
+#
+#   kubectl apply -k deploy/k8s/overlays/prod
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ai-gateway
+
+resources:
+  - ../../base
+
+components:
+  # Escolha UM provedor de vault:
+  - ../../components/vault-hashicorp
+  # - ../../components/vault-azure-keyvault
+  - ../../components/redis              # depois do vault
+  - ../../components/observability
+  # Escolha UMA forma de exposição:
+  - ../../components/expose-gateway-api
+  # - ../../components/expose-ingress
+
+# Deployments da Azure OpenAI deste ambiente: endpoint e versão da API.
+configMapGenerator:
+  - name: ai-gateway-env
+    behavior: merge
+    literals:
+      - AZURE_API_BASE=https://change-me-prod.openai.azure.com
+      - AZURE_API_VERSION=2025-04-01-preview
+      - REDIS_HOST=change-me-prod.redis.cache.windows.net
+      - REDIS_PORT=6380
+      - REDIS_SSL=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.observability:4317
+      - OTEL_ENVIRONMENT_NAME=production
+
+images:
+  - name: ai-gateway
+    newName: ghcr.io/edumartinsrib/ai-gateway
+    newTag: 0.1.0   # prefira fixar por digest: digest: sha256:...
+
+patches:
+  - path: patches/secretstore.yaml
+  - path: patches/httproute.yaml

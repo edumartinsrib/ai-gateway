@@ -1,0 +1,33 @@
+# Entrada restrita: API (4000) para o próprio namespace, para o controlador de
+# Ingress/Gateway e para namespaces marcados com ai-gateway/client=true (ex.: o GitHub App);
+# métricas (9090) só para o namespace de monitoramento.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ai-gateway
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ai-gateway
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - port: 4000
+      from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              ai-gateway/client: "true"
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: ["ingress-nginx", "gateway-system", "envoy-gateway-system", "app-routing-system", "istio-ingress"]
+    - ports:
+        - port: 9090
+      from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: ["monitoring", "observability", "prometheus"]

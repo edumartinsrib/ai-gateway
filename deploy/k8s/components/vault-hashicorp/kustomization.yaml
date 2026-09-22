@@ -1,0 +1,14 @@
+# Segredos lidos do HashiCorp Vault (KV v2) pelo External Secrets Operator.
+#
+# Pré-requisitos no Vault (exemplo):
+#   vault kv put secret/ai-gateway/azure-openai api_key=<chave-da-azure-openai>
+#   vault kv put secret/ai-gateway/gateway master_key=sk-... salt_key=sk-...
+#   vault kv put secret/ai-gateway/postgres url=postgresql://user:pass@host:5432/litellm?sslmode=require
+#   vault write auth/kubernetes/role/ai-gateway \
+#       bound_service_account_names=ai-gateway bound_service_account_namespaces=ai-gateway \
+#       policies=ai-gateway-read ttl=15m
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - secretstore.yaml
+  - externalsecret.yaml

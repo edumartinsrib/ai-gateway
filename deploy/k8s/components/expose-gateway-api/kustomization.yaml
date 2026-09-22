@@ -1,0 +1,7 @@
+# Exposição via Gateway API (HTTPRoute). Só /v1 (API compatível com OpenAI) é público;
+# a API de administração (/key, /team, /user, /ui) fica acessível apenas dentro do cluster
+# (use `kubectl port-forward` para o gatewayctl).
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - httproute.yaml

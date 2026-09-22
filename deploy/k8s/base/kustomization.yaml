@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ai-gateway
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: ai-gateway
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+
+# Configuração não sensível do ambiente. Os overlays sobrescrevem com `behavior: merge`.
+# O config.yaml do LiteLLM (deployments, orçamentos padrão, callbacks) vai dentro da
+# imagem; aqui ficam apenas os valores que mudam por ambiente.
+configMapGenerator:
+  - name: ai-gateway-env
+    literals:
+      - AZURE_API_BASE=https://change-me.openai.azure.com
+      - AZURE_API_VERSION=2025-04-01-preview
+      - PROMETHEUS_METRICS_PORT=9090
+      - GATEWAY_REQUIRE_TEAM=true
+      - GATEWAY_MAX_OUTPUT_TOKENS=32768
+      - OTEL_SERVICE_NAME=ai-gateway
+      - OTEL_EXPORTER=otlp_grpc
+
+# A imagem ("ai-gateway") é definida por overlay em `images:` (nome, tag ou digest).

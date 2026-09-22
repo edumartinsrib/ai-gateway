@@ -1,0 +1,30 @@
+# ~/.continue/config.yaml — extensão Continue (VS Code / JetBrains).
+# A chave fica em ~/.continue/.env:  AI_GATEWAY_KEY=sk-...
+name: AI Gateway
+version: 1.0.0
+schema: v1
+
+models:
+  - name: GPT-5.4 (AI Gateway)
+    provider: openai
+    model: gpt-5.4
+    apiBase: https://ai-gateway.example.com/v1
+    apiKey: ${{ secrets.AI_GATEWAY_KEY }}
+    roles: [chat, edit, apply]
+    defaultCompletionOptions:
+      contextLength: 272000
+      maxTokens: 32768
+
+  - name: GPT-5.4 mini (AI Gateway)
+    provider: openai
+    model: gpt-5.4-mini
+    apiBase: https://ai-gateway.example.com/v1
+    apiKey: ${{ secrets.AI_GATEWAY_KEY }}
+    roles: [chat, edit, apply, summarize]
+
+  - name: Embeddings (AI Gateway)
+    provider: openai
+    model: text-embedding-3-small
+    apiBase: https://ai-gateway.example.com/v1
+    apiKey: ${{ secrets.AI_GATEWAY_KEY }}
+    roles: [embed]

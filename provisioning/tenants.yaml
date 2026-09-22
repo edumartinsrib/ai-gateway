@@ -1,0 +1,53 @@
+# =============================================================================
+# Times, usuários e orçamentos (config as code)
+#
+#   gatewayctl apply -f provisioning/tenants.yaml --dry-run
+#   gatewayctl apply -f provisioning/tenants.yaml
+#
+# Camadas de orçamento (USD), todas verificadas a cada requisição — a primeira
+# que estourar bloqueia com HTTP 429 "budget_exceeded":
+#
+#   time            -> teto do time inteiro                 (teams[].max_budget)
+#   membro no time  -> teto do usuário dentro do time       (members[].max_budget_in_team)
+#   usuário         -> teto pessoal, somando todos os times (users[].max_budget)
+#   chave           -> teto de cada virtual key              (gatewayctl key create --max-budget)
+#
+# budget_duration reinicia o gasto periodicamente (ex.: 30d, 7d, 1d).
+# soft_budget só alerta (métricas/alertas), não bloqueia.
+# role: "user". O papel "admin" de time é recurso do LiteLLM Enterprise.
+# =============================================================================
+
+users:
+  - id: alice
+    email: alice@example.com
+    max_budget: 60
+    budget_duration: 30d
+  - id: bob
+    email: bob@example.com
+    max_budget: 30
+    budget_duration: 30d
+
+teams:
+  - id: platform
+    alias: platform-engineering
+    max_budget: 500
+    soft_budget: 400
+    budget_duration: 30d
+    models: [gpt-5.4, gpt-5.4-mini, text-embedding-3-small]
+    rpm_limit: 600
+    tpm_limit: 3000000
+    members:
+      - user: alice
+        max_budget_in_team: 60
+      - user: bob
+        max_budget_in_team: 30
+
+  # Time de serviço para o GitHub App: chave sem usuário, orçamento próprio e
+  # restrito ao modelo mais barato.
+  - id: github-app
+    alias: github-app-bots
+    max_budget: 150
+    soft_budget: 120
+    budget_duration: 30d
+    models: [gpt-5.4-mini]
+    rpm_limit: 120

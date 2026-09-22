@@ -1,0 +1,76 @@
+# Stack local: gateway + Postgres + mock da Azure OpenAI.
+#   make up                      -> sobe tudo (sem custo: usa o mock)
+#   make up-obs                  -> + Prometheus, Grafana e Jaeger
+#
+# Para usar a Azure de verdade, crie um .env com AZURE_API_KEY, AZURE_API_BASE e
+# AZURE_API_VERSION (veja .env.example).
+name: ai-gateway
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      retries: 20
+
+  mock-azure:
+    build: tests/mock_azure
+    environment:
+      MOCK_AZURE_API_KEY: ${MOCK_AZURE_API_KEY:-mock-azure-key}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 5s
+      retries: 20
+
+  gateway:
+    build: .
+    image: ai-gateway:dev
+    depends_on:
+      postgres: { condition: service_healthy }
+      mock-azure: { condition: service_healthy }
+    ports: ["4000:4000", "9090:9090"]
+    environment:
+      AZURE_API_KEY: ${AZURE_API_KEY:-mock-azure-key}
+      AZURE_API_BASE: ${AZURE_API_BASE:-http://mock-azure:8080}
+      AZURE_API_VERSION: ${AZURE_API_VERSION:-2025-04-01-preview}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-master-key}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:-sk-local-salt-key}
+      DATABASE_URL: postgresql://litellm:litellm@postgres:5432/litellm
+      PROMETHEUS_METRICS_PORT: "9090"
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER: otlp_grpc
+      OTEL_SERVICE_NAME: ai-gateway
+      OTEL_ENVIRONMENT_NAME: local
+    read_only: true
+    tmpfs: [/tmp]
+
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v3.14.0
+    volumes: ["./deploy/local/prometheus.yaml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["9091:9090"]
+
+  grafana:
+    profiles: [observability]
+    image: grafana/grafana:13.2.2
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./deploy/local/grafana-provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/k8s/components/observability/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+
+  jaeger:
+    profiles: [observability]
+    image: jaegertracing/jaeger:2.21.0
+    ports: ["16686:16686"]
+
+volumes:
+  pgdata:

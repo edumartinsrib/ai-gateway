@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: github-app
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    ai-gateway/client: "true"    # liberado pela NetworkPolicy do gateway

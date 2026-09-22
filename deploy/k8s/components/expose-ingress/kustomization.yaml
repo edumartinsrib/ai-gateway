@@ -1,0 +1,6 @@
+# Alternativa ao Gateway API para clusters que só têm um Ingress Controller.
+# Só /v1 é público; a API de administração fica interna.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - ingress.yaml

@@ -1,0 +1,17 @@
+# Só o endpoint do webhook é público (o GitHub precisa alcançá-lo).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: github-app
+spec:
+  parentRefs:
+    - name: public-gateway
+      namespace: gateway-system
+  hostnames:
+    - github-app.change-me.com
+  rules:
+    - matches:
+        - path: { type: Exact, value: /webhook }
+      backendRefs:
+        - name: github-app
+          port: 8080
