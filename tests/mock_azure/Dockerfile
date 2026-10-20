@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.15-slim
 RUN pip install --no-cache-dir "fastapi>=0.115,<1" "uvicorn>=0.30,<1"
 COPY server.py /app/server.py
 WORKDIR /app
